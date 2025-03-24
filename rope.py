@@ -50,26 +50,32 @@ def apply_rotary_emb(
 
     _, seqlen, _, _ = query.shape
     device = query.device
-    # todo
-    #
-    # Please refer to slide 22 in https://phontron.com/class/anlp2024/assets/slides/anlp-05-transformers.pdf
-    # and Section 3 in https://arxiv.org/abs/2104.09864.
 
-    # reshape xq and xk to match the complex representation
+    if seqlen > max_seq_len:
+        seqlen = max_seq_len
+        query = query[:, :seqlen, :, :]
+        key = key[:, :seqlen, :, :]
+
+    # Chuyển đổi query và key thành dạng số phức (biểu diễn dưới dạng cặp giá trị real và imag)
     query_real, query_imag = query.float().reshape(query.shape[:-1] + (-1, 2)).unbind(-1)
     key_real, key_imag = key.float().reshape(key.shape[:-1] + (-1, 2)).unbind(-1)
-    # This separates each query/key vector into its odd and even indices (assuming *one-indexing*).
-    # query_real contains q_1, q_3, q_5, ... and query_imag contains q_2, q_4, q_6, ...
 
-    # First, compute the trigonometric values in the second and fourth columns in
-    # slide 22 (linked above).
+    # query_real chứa các phần tử tại chỉ số lẻ (q_1, q_3, q_5, ...)
+    # query_imag chứa các phần tử tại chỉ số chẵn (q_2, q_4, q_6, ...)
 
-    # Then, combine these trigonometric values with the tensors query_real, query_imag,
-    # key_real, and key_imag.
-
-    raise NotImplementedError
-
-    query_out = None
-    key_out = None
+    # Tính toán ma trận sin và cos để xoay vector
+    d = head_dim
+    Theta = torch.tensor([theta**(-2 * i / d) for i in range(d//2)]).to(device)
+    sin_matrix = torch.stack([torch.sin(m * Theta) for m in range(seqlen)]).reshape([1, seqlen, -1, d//2]).to(device)
+    cos_matrix = torch.stack([torch.cos(m * Theta) for m in range(seqlen)]).reshape([1, seqlen, -1, d//2]).to(device)
+    
+    # Thực hiện phép quay vector (theo công thức số phức):
+    query_real, query_imag = query_real * cos_matrix - query_imag * sin_matrix, query_real * sin_matrix + query_imag * cos_matrix
+    key_real, key_imag = key_real * cos_matrix - key_imag * sin_matrix, key_real * sin_matrix + key_imag * cos_matrix
+    
+    # Gộp lại thành tensor đầu ra ban đầu
+    query_out = torch.stack((query_real, query_imag), dim=-1).reshape(query.shape)
+    key_out = torch.stack((key_real, key_imag), dim=-1).reshape(key.shape)
+    
     # Return the rotary position embeddings for the query and key tensors
     return query_out, key_out

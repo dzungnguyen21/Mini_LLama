@@ -72,7 +72,7 @@ def create_data(filename, tokenizer: Tokenizer, flag: str ='train', lower: bool 
 	num_labels = {}
 	data = []
 
-	with open(filename, 'r') as fp:
+	with open(filename, 'r', encoding="utf-8") as fp:
 		for line in fp:
 			label, org_sent = line.split(' ||| ')
 			if lower:
@@ -222,7 +222,7 @@ def generate_sentence(args, prefix, outfile, max_new_tokens = 75, temperature = 
 				writer.close()
 
 def write_predictions_to_file(split: str, outfile: str, acc: float, pred: list[str], sents: list[str]):
-	with open(outfile, "w+") as f:
+	with open(outfile, "w+", encoding='utf-8') as f:
 		print(f"{split} acc :: {acc :.3f}")
 		for s, p in zip(sents, pred):
 			f.write(f"{p} ||| {s}\n")
