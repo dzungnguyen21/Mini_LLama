@@ -131,70 +131,72 @@ def save_model(model, optimizer, args, config, filepath):
 	print(f"save the model to {filepath}")
 
 def train(args):
-	device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
-	#### Load data
-	# create the data and its corresponding datasets and dataloader
-	tokenizer = Tokenizer(args.max_sentence_len)
-	train_data, num_labels = create_data(args.train, tokenizer, 'train')
-	dev_data = create_data(args.dev, tokenizer, 'valid')
+    device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
+    #### Load data
+    # create the data and its corresponding datasets and dataloader
+    tokenizer = Tokenizer(args.max_sentence_len)
+    train_data, num_labels = create_data(args.train, tokenizer, 'train')
+    dev_data = create_data(args.dev, tokenizer, 'valid')
 
-	train_dataset = LlamaDataset(train_data, args)
-	dev_dataset = LlamaDataset(dev_data, args)
+    train_dataset = LlamaDataset(train_data, args)
+    dev_dataset = LlamaDataset(dev_data, args)
 
-	train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size,
-								  collate_fn=train_dataset.collate_fn)
-	dev_dataloader = DataLoader(dev_dataset, shuffle=False, batch_size=args.batch_size,
-								collate_fn=dev_dataset.collate_fn)
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size,
+                                  collate_fn=train_dataset.collate_fn)
+    dev_dataloader = DataLoader(dev_dataset, shuffle=False, batch_size=args.batch_size,
+                                collate_fn=dev_dataset.collate_fn)
 
-	#### Init model
-	config = {'hidden_dropout_prob': args.hidden_dropout_prob,
-			  'pretrained_model_path': args.pretrained_model_path,
-			  'num_labels': num_labels,
-			  'data_dir': '.',
-			  'option': args.option}
+    #### Init model
+    config = {'hidden_dropout_prob': args.hidden_dropout_prob,
+              'pretrained_model_path': args.pretrained_model_path,
+              'num_labels': num_labels,
+              'data_dir': '.',
+              'option': args.option}
 
-	config = SimpleNamespace(**config)
+    config = SimpleNamespace(**config)
 
-	# initialize the Senetence Classification Model
-	model = LlamaEmbeddingClassifier(config)
-	model = model.to(device)
+    # initialize the Sentence Classification Model
+    model = LlamaEmbeddingClassifier(config)
+    model = model.to(device)
 
-	lr = args.lr
-	## specify the optimizer
-	optimizer = AdamW(model.parameters(), lr=lr)
-	best_dev_acc = 0
+    lr = args.lr
+    ## specify the optimizer
+    optimizer = AdamW(model.parameters(), lr=lr)
+    best_dev_acc = 0
 
-	## run for the specified number of epochs
-	for epoch in tqdm(range(args.epochs)):
-		model.train()
-		train_loss = 0
-		num_batches = 0
-		for step, batch in enumerate(tqdm(train_dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE)):
-			b_ids, b_labels, b_sents = batch['token_ids'], batch['labels'], batch['sents']
+    ## run for the specified number of epochs
+    for epoch in tqdm(range(args.epochs)):
+        model.train()
+        train_loss = 0
+        num_batches = 0
+        for step, batch in enumerate(tqdm(train_dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE)):
+            b_ids, b_labels, b_sents = batch['token_ids'], batch['labels'], batch['sents']
 
-			b_ids = b_ids.to(device)
-			b_labels = b_labels.to(device)
+            b_ids = b_ids.to(device)
+            b_labels = b_labels.to(device)
 
-			optimizer.zero_grad()
-			logits = model(b_ids)
-			loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
+            optimizer.zero_grad()
+            logits = model(b_ids)
+            loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
 
-			loss.backward()
-			optimizer.step()
+            loss.backward()
+            optimizer.step()
 
-			train_loss += loss.item()
-			num_batches += 1
+            train_loss += loss.item()
+            num_batches += 1
 
-		train_loss = train_loss / (num_batches)
+        train_loss = train_loss / (num_batches)
 
-		train_acc, train_f1, *_ = model_eval(train_dataloader, model, device)
-		dev_acc, dev_f1, *_ = model_eval(dev_dataloader, model, device)
+        train_acc, train_f1, *_ = model_eval(train_dataloader, model, device)
+        dev_acc, dev_f1, *_ = model_eval(dev_dataloader, model, device)
 
-		if dev_acc > best_dev_acc:
-			best_dev_acc = dev_acc
-			save_model(model, optimizer, args, config, args.filepath)
+        if dev_acc > best_dev_acc:
+            best_dev_acc = dev_acc
+            save_model(model, optimizer, args, config, args.filepath)
 
-		print(f"epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+        # Print results only every 5 epochs (epoch is 0-indexed, so we use epoch + 1)
+        if (epoch + 1) % 5 == 0:
+            print(f"epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
 
 def generate_sentence(args, prefix, outfile, max_new_tokens = 75, temperature = 0.0):
 	with torch.no_grad():
