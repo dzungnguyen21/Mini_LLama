@@ -310,14 +310,6 @@ class Llama(LlamaPreTrainedModel):
                 # select the single most likely index
                 idx_next = torch.argmax(logits, dim=-1, keepdim=True)
             else:
-                '''
-                Perform temperature sampling:
-                1) identify  the logits at the final step.
-                2) scale (divide) these probabilities by the given temperature.
-                3) normalize the scaled logits with a softmax to obtain scaled probabilities.
-                4) sample from the scaled probability distribution.
-                Note that we are not using top-k sampling/nucleus sampling in this procedure.
-                '''
                 logits = logits / temperature
                 probs = torch.softmax(logits, dim=-1)
                 idx_next = torch.multinomial(probs, num_samples=1) # lấy mẫu từ một phân phối xác suất rời rạc probs
