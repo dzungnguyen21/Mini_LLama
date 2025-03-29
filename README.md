@@ -54,9 +54,6 @@ Contributions are welcome! Please follow these steps:
 3. Commit your changes.
 4. Push to your fork and create a pull request.
 
-## License
-This project is licensed under the MIT License.
-
 ## Contact
 For questions and collaborations, feel free to reach out via GitHub issues or email.
 
